@@ -126,6 +126,7 @@ class Connection(object):
         self.encoding = encoding
         self.call_16 = call_16
         self.connection_timeout = connection_timeout
+        self.authenticated = False
         if connect_now:
             self.connect()
 
@@ -200,9 +201,11 @@ class Connection(object):
         :raise: `NetworkError`
         '''
         try:
+            self.authenticated = False
             self.connect_basic()
             self.handshake()
             self.load_schema()
+            self.authenticated = True
         except Exception as e:
             self.connected = False
             raise NetworkError(e)
@@ -370,14 +373,33 @@ class Connection(object):
 
         :rtype: `Response` instance
         '''
-        assert isinstance(func_name, str)
 
         # This allows to use a tuple or list as an argument
         if len(args) == 1 and isinstance(args[0], (list, tuple)):
             args = args[0]
 
+        return self.call_ex(func_name, args, True)
+
+    def call_ex(self, func_name, args=[], reconnect=True):
+        '''
+        Execute CALL request. Call stored Lua function.
+
+        :param func_name: stored Lua function name
+        :type func_name: str
+        :param args: list of function arguments
+        :type args: list or tuple
+        :param reconnect: reconnect before call
+        :type reconnect: boolean
+
+        :rtype: `Response` instance
+        '''
+        assert isinstance(func_name, str)
+
         request = RequestCall(self, func_name, args, self.call_16)
-        response = self._send_request(request)
+        if reconnect:
+            response = self._send_request(request)
+        else:
+            response = self._send_request_wo_reconnect(request)
         return response
 
     def eval(self, expr, *args):
@@ -391,14 +413,33 @@ class Connection(object):
 
         :rtype: `Response` instance
         '''
-        assert isinstance(expr, str)
 
         # This allows to use a tuple or list as an argument
         if len(args) == 1 and isinstance(args[0], (list, tuple)):
             args = args[0]
 
+        return self.eval_ex(expr, args, True)
+
+    def eval_ex(self, expr, args=[], reconnect=True):
+        '''
+        Execute EVAL request. Eval Lua expression.
+
+        :param expr: Lua expression
+        :type expr: str
+        :param args: list of function arguments
+        :type args: list or tuple
+        :param reconnect: reconnect before call
+        :type reconnect: boolean
+
+        :rtype: `Response` instance
+        '''
+        assert isinstance(expr, str)
+
         request = RequestEval(self, expr, args)
-        response = self._send_request(request)
+        if reconnect:
+            response = self._send_request(request)
+        else:
+            response = self._send_request_wo_reconnect(request)
         return response
 
     def replace(self, space_name, values):
