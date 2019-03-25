@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 
+import os
 import sys
 import unittest
 import warnings
@@ -16,8 +17,7 @@ class TestSuite_Reconnect(unittest.TestCase):
         print('-' * 70, file=sys.stderr)
         self.srv = TarantoolServer()
         self.srv.script = 'unit/suites/box.lua'
-        self.srv2 = TarantoolServer()
-        self.srv2.script = 'unit/suites/box.lua'
+        self.srv2 = None
 
     def setUp(self):
         # prevent a remote tarantool from clean our session
@@ -69,11 +69,17 @@ class TestSuite_Reconnect(unittest.TestCase):
         self.srv.stop()
 
     def test_03_mesh(self):
+        # Multiple servers are not supported on Windows
+        if os.name == 'nt':
+            return
+
         # Start two servers
         self.srv.start()
         self.srv.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
         self.srv.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
 
+        self.srv2 = TarantoolServer()
+        self.srv2.script = 'unit/suites/box.lua'
         self.srv2.start()
         self.srv2.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
         self.srv2.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
@@ -126,11 +132,17 @@ class TestSuite_Reconnect(unittest.TestCase):
         con.close()
 
     def test_04_mesh_exclude_node(self):
+        # Multiple servers are not supported on Windows
+        if os.name == 'nt':
+            return
+
         # Start two servers
         self.srv.start()
         self.srv.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
         self.srv.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
 
+        self.srv2 = TarantoolServer()
+        self.srv2.script = 'unit/suites/box.lua'
         self.srv2.start()
         self.srv2.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
         self.srv2.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
@@ -175,4 +187,5 @@ class TestSuite_Reconnect(unittest.TestCase):
     @classmethod
     def tearDownClass(self):
         self.srv.clean()
-        self.srv2.clean()
+        if self.srv2:
+            self.srv2.clean()
