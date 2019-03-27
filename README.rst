@@ -65,7 +65,7 @@ Features
     * MsgPack data format and MsgPack based client-server protocol
     * Two data engines:
         * 100% in-memory with optional persistence
-        * 2-level disk-based B-tree, to use with large data sets (powered by `Sophia`_)
+        * LSM-tree based disk storage to use with large data sets
     * secondary key and index iterators support (can be non-unique and composite)
     * multiple index types: HASH, BITSET, TREE
     * asynchronous master-master replication
@@ -78,6 +78,26 @@ See More
  * `Tarantool at Github`_
  * `Tarantool User Guide`_
  * `Client-server Protocol Specification`_
+
+How to use the connector
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: lua
+
+    import tarantool
+    con = tarantool.Connection(host='localhost',
+                               port=3301,
+                               user='test',
+                               password='test',
+                               connect_now=True)
+
+
+    resp = con.eval('return "Hello Wrold!"')
+    if resp.data[0] == "Hello World!":
+        print('Ok')
+
+This will print 'Ok' assuming that there's a running Tarantool instance on port
+3301 on local machine and user test has execute privilege on universe.
 
 NOTE
 ^^^^

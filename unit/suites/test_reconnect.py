@@ -76,13 +76,13 @@ class TestSuite_Reconnect(unittest.TestCase):
         # Start two servers
         self.srv.start()
         self.srv.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
-        self.srv.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
+        self.srv.admin("box.schema.user.grant('test', 'execute', 'universe')")
 
         self.srv2 = TarantoolServer()
         self.srv2.script = 'unit/suites/box.lua'
         self.srv2.start()
         self.srv2.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
-        self.srv2.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
+        self.srv2.admin("box.schema.user.grant('test', 'execute', 'universe')")
 
         # get_nodes function contains both servers' addresses
         get_nodes = " \
@@ -140,13 +140,13 @@ class TestSuite_Reconnect(unittest.TestCase):
         # Start two servers
         self.srv.start()
         self.srv.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
-        self.srv.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
+        self.srv.admin("box.schema.user.grant('test', 'execute', 'universe')")
 
         self.srv2 = TarantoolServer()
         self.srv2.script = 'unit/suites/box.lua'
         self.srv2.start()
         self.srv2.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
-        self.srv2.admin("box.schema.user.grant('test', 'read,write,execute', 'universe')")
+        self.srv2.admin("box.schema.user.grant('test', 'execute', 'universe')")
 
         # get_nodes function contains only the second server address
         get_nodes = " \
