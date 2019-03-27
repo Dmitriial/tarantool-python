@@ -26,6 +26,14 @@ class RoundRobinStrategy(object):
         self.pos = (self.pos + 1) % len(self.addrs)
         return self.addrs[tmp]
 
+def parse_uri(uri_str):
+    if not uri_str:
+        return
+    uri = uri_str.split(':')
+    host = uri[0]
+    port = int(uri[1])
+    if host and port:
+        return {'host': host, 'port': port}
 
 class MeshConnection(Connection):
     '''
@@ -37,51 +45,44 @@ class MeshConnection(Connection):
     the list and switch nodes in case of unavailability of the current node.
 
     'get_nodes_function_name' param of the constructor sets the name of a stored
-    Lua function used to refresh the list of available nodes. A generic function
-    for getting the list of nodes looks like this:
+    Lua function used to refresh the list of available nodes. The function takes
+    no parameters and returns a list of strings in format 'host:port'. A generic
+    function for getting the list of nodes looks like this:
 
     .. code-block:: lua
 
-        function get_nodes()
+        function get_cluster_nodes()
             return {
-                {
-                    host = '192.168.0.1',
-                    port = 3301
-                },
-                {
-                    host = '192.168.0.2',
-                    port = 3302
-                },
-
+                '192.168.0.1:3301',
+                '192.168.0.2:3302',
                 -- ...
             }
         end
 
     You may put in this list whatever you need depending on your cluster
     topology. Chances are you'll want to make the list of nodes from nodes'
-    replication config. So here is an example for it:
+    replication config. Here is an example for it:
 
     .. code-block:: lua
 
         local uri_lib = require('uri')
 
-        function get_nodes()
+        function get_cluster_nodes()
             local nodes = {}
 
             local replicas = box.cfg.replication
 
             for i = 1, #replicas do
                 local uri = uri_lib.parse(replicas[i])
-                local port = tonumber(uri.service)
 
-                if uri.host and port then
-                    table.insert(nodes, { host = uri.host, port = port })
+                if uri.host and uri.service then
+                    table.insert(nodes, uri.host .. ':' .. uri.service)
                 end
             end
 
             -- if your replication config doesn't contain the current node
             -- you have to add it manually like this:
-            table.insert(nodes, { host = '192.168.0.1', port = 3301 })
+            table.insert(nodes, '192.168.0.1:3301')
 
             return nodes
         end
@@ -150,8 +151,14 @@ class MeshConnection(Connection):
         if not (resp.data and resp.data[0]):
             return
 
-        addrs = resp.data[0]
-        if type(addrs) is list:
+        addrs_raw = resp.data[0]
+        if type(addrs_raw) is list:
+            addrs = []
+            for uri_str in addrs_raw:
+                addr = parse_uri(uri_str)
+                if addr:
+                    addrs.append(addr)
+
             self.strategy = self.strategy_class(addrs)
             self.last_nodes_refresh = cur_time
             if not {'host': self.host, 'port': self.port} in addrs:

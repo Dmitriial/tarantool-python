@@ -86,17 +86,8 @@ class TestSuite_Reconnect(unittest.TestCase):
 
         # get_nodes function contains both servers' addresses
         get_nodes = " \
-            function get_nodes() \
-                return { \
-                    { \
-                        host = '%s', \
-                        port = tonumber(%d) \
-                    }, \
-                    { \
-                        host = '%s', \
-                        port = tonumber(%d) \
-                    } \
-                } \
+            function get_cluster_nodes() \
+                return { '%s:%d', '%s:%d' } \
             end" % (self.srv.host, self.srv.args['primary'], self.srv2.host, self.srv2.args['primary'])
 
         # Create get_nodes function on servers
@@ -112,7 +103,7 @@ class TestSuite_Reconnect(unittest.TestCase):
             'host': self.srv.host, 'port': self.srv.args['primary']}],
             user='test',
             password='test',
-            get_nodes_function_name='get_nodes',
+            get_nodes_function_name='get_cluster_nodes',
             connect_now=True)
 
         # Check we work with the first server
@@ -150,13 +141,8 @@ class TestSuite_Reconnect(unittest.TestCase):
 
         # get_nodes function contains only the second server address
         get_nodes = " \
-            function get_nodes() \
-                return { \
-                    { \
-                        host = '%s', \
-                        port = tonumber(%d) \
-                    } \
-                } \
+            function get_cluster_nodes() \
+                return { '%s:%d' } \
             end" % (self.srv2.host, self.srv2.args['primary'])
 
         # Create get_nodes function on servers
@@ -172,7 +158,7 @@ class TestSuite_Reconnect(unittest.TestCase):
             'host': self.srv.host, 'port': self.srv.args['primary']}],
             user='test',
             password='test',
-            get_nodes_function_name='get_nodes',
+            get_nodes_function_name='get_cluster_nodes',
             connect_now=True)
 
         # Check we work with the second server
