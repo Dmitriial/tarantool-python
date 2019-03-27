@@ -112,6 +112,7 @@ class TestSuite_Reconnect(unittest.TestCase):
             'host': self.srv.host, 'port': self.srv.args['primary']}],
             user='test',
             password='test',
+            get_nodes_function_name='get_nodes',
             connect_now=True)
 
         # Check we work with the first server
@@ -171,6 +172,7 @@ class TestSuite_Reconnect(unittest.TestCase):
             'host': self.srv.host, 'port': self.srv.args['primary']}],
             user='test',
             password='test',
+            get_nodes_function_name='get_nodes',
             connect_now=True)
 
         # Check we work with the second server

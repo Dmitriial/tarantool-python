@@ -37,6 +37,7 @@ class MeshConnection(Connection):
                  connect_now=True,
                  encoding=ENCODING_DEFAULT,
                  strategy_class=RoundRobinStrategy,
+                 get_nodes_function_name=None,
                  nodes_refresh_interval=NODES_REFRESH_INTERVAL):
         self.nattempts = 2 * len(addrs) + 1
         self.strategy = strategy_class(addrs)
@@ -44,6 +45,7 @@ class MeshConnection(Connection):
         addr = self.strategy.getnext()
         host = addr['host']
         port = addr['port']
+        self.get_nodes_function_name = get_nodes_function_name
         self.nodes_refresh_interval = nodes_refresh_interval
         self.last_nodes_refresh = 0
         super(MeshConnection, self).__init__(host=host,
@@ -70,19 +72,14 @@ class MeshConnection(Connection):
         else:
             raise NetworkError
 
-        if self.authenticated:
+        if self.authenticated and self.get_nodes_function_name:
             now = time.time()
             if now - self.last_nodes_refresh > self.nodes_refresh_interval:
                 self.refresh_nodes(now)
 
     def refresh_nodes(self, cur_time):
-        resp = super(MeshConnection, self).eval_ex('return get_nodes ~= nil',
+        resp = super(MeshConnection, self).call_ex(self.get_nodes_function_name,
                                                    [], reconnect=False)
-        if not (resp.data and resp.data[0]):
-            return
-
-        resp = super(MeshConnection, self).call_ex('get_nodes', [],
-                                                   reconnect=False)
 
         if not (resp.data and resp.data[0]):
             return
