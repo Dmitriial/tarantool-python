@@ -9,12 +9,16 @@ from tarantool.connection import Connection
 from tarantool.error import NetworkError
 from tarantool.utils import ENCODING_DEFAULT
 from tarantool.const import (
+    CONNECTION_TIMEOUT,
     SOCKET_TIMEOUT,
     RECONNECT_MAX_ATTEMPTS,
     RECONNECT_DELAY,
-    NODES_REFRESH_INTERVAL
+    DEFAULT_CLUSTER_DISCOVERY_DELAY_MILLIS,
 )
 
+from tarantool.utils import (
+    ENCODING_DEFAULT
+)
 
 class RoundRobinStrategy(object):
     def __init__(self, addrs):
@@ -88,7 +92,7 @@ class MeshConnection(Connection):
         end
     '''
 
-    def __init__(self, addrs,
+    def __init__(self, host, port,
                  user=None,
                  password=None,
                  socket_timeout=SOCKET_TIMEOUT,
@@ -96,18 +100,28 @@ class MeshConnection(Connection):
                  reconnect_delay=RECONNECT_DELAY,
                  connect_now=True,
                  encoding=ENCODING_DEFAULT,
+                 call_16=False,
+                 connection_timeout=CONNECTION_TIMEOUT,
+                 cluster_list = None,
                  strategy_class=RoundRobinStrategy,
                  get_nodes_function_name=None,
-                 nodes_refresh_interval=NODES_REFRESH_INTERVAL):
-        self.nattempts = 2 * len(addrs) + 1
+                 nodes_refresh_interval=DEFAULT_CLUSTER_DISCOVERY_DELAY_MILLIS):
+
+        addrs = [{"host":host, "port":port}]
+        if cluster_list:
+            for i in cluster_list:
+                if i["host"] == host or i["port"] == port:
+                    continue
+                addrs.append(i)
+        
         self.strategy = strategy_class(addrs)
         self.strategy_class = strategy_class
         addr = self.strategy.getnext()
         host = addr['host']
         port = addr['port']
         self.get_nodes_function_name = get_nodes_function_name
-        self.nodes_refresh_interval = nodes_refresh_interval >= 30 and nodes_refresh_interval or 30
-        self.last_nodes_refresh = 0
+        self.nodes_refresh_interval = nodes_refresh_interval
+        self.last_nodes_refresh = time.time()
         super(MeshConnection, self).__init__(host=host,
                                              port=port,
                                              user=user,
@@ -116,54 +130,69 @@ class MeshConnection(Connection):
                                              reconnect_max_attempts=reconnect_max_attempts,
                                              reconnect_delay=reconnect_delay,
                                              connect_now=connect_now,
-                                             encoding=encoding)
+                                             encoding=encoding,
+                                             call_16=call_16,
+                                             connection_timeout=connection_timeout)
 
-    def _opt_reconnect(self):
-        nattempts = self.nattempts
-        while nattempts > 0:
-            try:
-                super(MeshConnection, self)._opt_reconnect()
-                break
-            except NetworkError:
-                nattempts -= 1
-                addr = self.strategy.getnext()
-                self.host = addr['host']
-                self.port = addr['port']
-        else:
-            raise NetworkError
+    def _opt_refresh_instances(self):
+        """
+        Refresh list of cluster instances. If current connection not in server list will change connection.
+        """
+        now = time.time()
 
-        if self.authenticated and self.get_nodes_function_name:
-            now = time.time()
-            if now - self.last_nodes_refresh > self.nodes_refresh_interval:
-                self.refresh_nodes(now)
+        if self.connected and now - self.last_nodes_refresh > self.nodes_refresh_interval/1000:
+            resp = self.call(self.get_nodes_function_name, reconnect=False)
 
-    def refresh_nodes(self, cur_time):
-        '''
-        Refreshes nodes list by calling Lua function with name
-        self.get_nodes_function_name on the current node. If this field is None
-        no refresh occurs. Usually you don't need to call this function manually
-        since it's called automatically during reconnect every
-        self.nodes_refresh_interval seconds.
-        '''
-        resp = super(MeshConnection, self).call_ex(self.get_nodes_function_name,
-                                                   [], reconnect=False)
+            # got data to refresh        
+            if resp.data and resp.data[0]:
+                addrs = list(parse_uri(i) for i in resp.data[0])
+                self.strategy = self.strategy_class(addrs)
+                self.last_nodes_refresh = now
 
-        if not (resp.data and resp.data[0]):
-            return
-
-        addrs_raw = resp.data[0]
-        if type(addrs_raw) is list:
-            addrs = []
-            for uri_str in addrs_raw:
-                addr = parse_uri(uri_str)
-                if addr:
-                    addrs.append(addr)
-
-            self.strategy = self.strategy_class(addrs)
-            self.last_nodes_refresh = cur_time
             if not {'host': self.host, 'port': self.port} in addrs:
                 addr = self.strategy.getnext()
                 self.host = addr['host']
                 self.port = addr['port']
                 self.close()
-                self._opt_reconnect()
+        
+        if not self.connected:
+            
+            nattempts = (len(self.strategy.addrs) * 2) + 1
+
+            while nattempts >= 0:
+                try:
+                    addr = self.strategy.getnext()
+                    if addr['host'] != self.host or addr['port'] != self.port:
+                        self.host = addr['host']
+                        self.port = addr['port']
+                        self._opt_reconnect()
+                        break
+                    else:
+                        nattempts -= 1
+                except NetworkError:
+                    continue
+            else:
+                raise NetworkError
+    
+    def _send_request(self, request):
+        '''
+        Send the request to the server through the socket.
+        Return an instance of `Response` class.
+
+        Update instances list from server `get_nodes_function_name` function. 
+
+        :param request: object representing a request
+        :type request: `Request` instance
+
+        :rtype: `Response` instance
+        '''
+        if self.get_nodes_function_name:
+            self._opt_refresh_instances()
+        
+        try:
+            return super(MeshConnection, self)._send_request(request)
+        except NetworkError:
+            self.connected = False
+            self._opt_refresh_instances()
+        finally:
+            return super(MeshConnection, self)._send_request(request)

@@ -87,4 +87,4 @@ RECONNECT_MAX_ATTEMPTS = 10
 # Default delay between attempts to reconnect (seconds)
 RECONNECT_DELAY = 0.1
 # Default cluster nodes list refresh interval (seconds)
-NODES_REFRESH_INTERVAL = 300
+DEFAULT_CLUSTER_DISCOVERY_DELAY_MILLIS = 60000
