@@ -20,11 +20,11 @@ from tarantool.request import (
     RequestCall
 )
 
-from tarantool.utils import (
-    ENCODING_DEFAULT
-)
 
 class RoundRobinStrategy(object):
+    """
+    Simple roundrobin address rotation
+    """
     def __init__(self, addrs):
         self.addrs = addrs
         self.pos = 0
@@ -34,14 +34,22 @@ class RoundRobinStrategy(object):
         self.pos = (self.pos + 1) % len(self.addrs)
         return self.addrs[tmp]
 
+
 def parse_uri(uri_str):
-    if not uri_str:
-        return
+    if not uri_str or ':' not in uri_str:
+        return None
     uri = uri_str.split(':')
     host = uri[0]
-    port = int(uri[1])
+    try:
+        port = int(uri[1])
+    except ValueError:
+        return None
+    
     if host and port:
         return {'host': host, 'port': port}
+    else:
+        return None
+
 
 class MeshConnection(Connection):
     '''
@@ -106,18 +114,18 @@ class MeshConnection(Connection):
                  encoding=ENCODING_DEFAULT,
                  call_16=False,
                  connection_timeout=CONNECTION_TIMEOUT,
-                 cluster_list = None,
+                 cluster_list=None,
                  strategy_class=RoundRobinStrategy,
                  get_nodes_function_name=None,
                  nodes_refresh_interval=DEFAULT_CLUSTER_DISCOVERY_DELAY_MILLIS):
 
-        addrs = [{"host":host, "port":port}]
+        addrs = [{"host": host, "port": port}]
         if cluster_list:
             for i in cluster_list:
                 if i["host"] == host or i["port"] == port:
                     continue
                 addrs.append(i)
-        
+
         self.strategy = strategy_class(addrs)
         self.strategy_class = strategy_class
         addr = self.strategy.getnext()
@@ -140,28 +148,29 @@ class MeshConnection(Connection):
 
     def _opt_refresh_instances(self):
         """
-        Refresh list of cluster instances. If current connection not in server list will change connection.
+        Refresh list of cluster instances.
+        If current connection not in server list will change connection.
         """
         now = time.time()
 
         if self.connected and now - self.last_nodes_refresh > self.nodes_refresh_interval/1000:
             request = RequestCall(self, self.get_nodes_function_name, (), self.call_16)
-            resp =  self._send_request_wo_reconnect(request)
+            resp = self._send_request_wo_reconnect(request)
 
-            # got data to refresh        
+            # got data to refresh
             if resp.data and resp.data[0]:
                 addrs = list(parse_uri(i) for i in resp.data[0])
                 self.strategy = self.strategy_class(addrs)
                 self.last_nodes_refresh = now
 
-            if not {'host': self.host, 'port': self.port} in addrs:
+            if {'host': self.host, 'port': self.port} not in addrs:
                 addr = self.strategy.getnext()
                 self.host = addr['host']
                 self.port = addr['port']
                 self.close()
-        
+
         if not self.connected:
-            
+
             nattempts = (len(self.strategy.addrs) * 2) + 1
 
             while nattempts >= 0:
@@ -178,13 +187,13 @@ class MeshConnection(Connection):
                     continue
             else:
                 raise NetworkError
-    
+
     def _send_request(self, request):
         '''
         Send the request to the server through the socket.
         Return an instance of `Response` class.
 
-        Update instances list from server `get_nodes_function_name` function. 
+        Update instances list from server `get_nodes_function_name` function.
 
         :param request: object representing a request
         :type request: `Request` instance
@@ -193,7 +202,7 @@ class MeshConnection(Connection):
         '''
         if self.get_nodes_function_name:
             self._opt_refresh_instances()
-        
+
         try:
             return super(MeshConnection, self)._send_request(request)
         except NetworkError:

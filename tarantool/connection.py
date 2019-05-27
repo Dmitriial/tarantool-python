@@ -138,7 +138,7 @@ class Connection(object):
         self._socket = None
 
     def connect_basic(self):
-        if self.host == None:
+        if self.host is None:
             self.connect_unix()
         else:
             self.connect_tcp()
@@ -293,12 +293,11 @@ class Connection(object):
                 retbytes = self._sys_recv(sock_fd, buf, 1, flag)
 
                 err = 0
-                if os.name!= 'nt':
+                if os.name != 'nt':
                     err = ctypes.get_errno()
                 else:
                     err = ctypes.get_last_error()
                     self._socket.setblocking(True)
-
 
                 WWSAEWOULDBLOCK = 10035
                 if (retbytes < 0) and (err == errno.EAGAIN or

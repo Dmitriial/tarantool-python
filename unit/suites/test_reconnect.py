@@ -2,7 +2,6 @@
 
 from __future__ import print_function
 
-import os
 import sys
 import unittest
 import warnings
@@ -69,5 +68,4 @@ class TestSuite_Reconnect(unittest.TestCase):
 
     @classmethod
     def tearDownClass(self):
-        self.srv.stop()
         self.srv.clean()
