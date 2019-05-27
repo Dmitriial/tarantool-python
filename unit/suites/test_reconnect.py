@@ -70,3 +70,4 @@ class TestSuite_Reconnect(unittest.TestCase):
     @classmethod
     def tearDownClass(self):
         self.srv.stop()
+        self.srv.clean()

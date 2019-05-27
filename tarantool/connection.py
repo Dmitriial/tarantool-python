@@ -360,7 +360,7 @@ class Connection(object):
         self.schema.flush()
         self.load_schema()
 
-    def call(self, func_name, *args, reconnect=True):
+    def call(self, func_name, *args):
         '''
         Execute CALL request. Call stored Lua function.
 
@@ -368,8 +368,6 @@ class Connection(object):
         :type func_name: str
         :param args: function arguments
         :type args: tuple
-        :param reconnect: reconnect before call
-        :type reconnect: boolean
 
         :rtype: `Response` instance
         '''
@@ -381,13 +379,9 @@ class Connection(object):
             args = args[0]
 
         request = RequestCall(self, func_name, args, self.call_16)
-        if reconnect:
-            response = self._send_request(request)
-        else:
-            response = self._send_request_wo_reconnect(request)
-        return response
+        return self._send_request(request)
 
-    def eval(self, expr, *args, reconnect=True):
+    def eval(self, expr, *args):
         '''
         Execute EVAL request. Eval Lua expression.
 
@@ -405,11 +399,7 @@ class Connection(object):
             args = args[0]
         
         request = RequestEval(self, expr, args)
-        if reconnect:
-            response = self._send_request(request)
-        else:
-            response = self._send_request_wo_reconnect(request)
-        return response
+        return self._send_request(request)
 
     def replace(self, space_name, values):
         '''

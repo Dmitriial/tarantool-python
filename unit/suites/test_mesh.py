@@ -20,7 +20,6 @@ class TestSuite_Mesh(unittest.TestCase):
         self.srv = TarantoolServer()
         self.srv.script = 'unit/suites/box.lua'
         self.srv.start()
-        print("Started on ", self.srv.args['primary'])
         self.srv.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
         self.srv.admin("box.schema.user.grant('test', 'execute', 'universe')")
         
@@ -28,7 +27,6 @@ class TestSuite_Mesh(unittest.TestCase):
         self.srv2 = TarantoolServer()
         self.srv2.script = 'unit/suites/box.lua'
         self.srv2.start()
-        print("Started on ", self.srv2.args['primary'])
         self.srv2.admin("box.schema.user.create('test', { password = 'test', if_not_exists = true })")
         self.srv2.admin("box.schema.user.grant('test', 'execute', 'universe')")
 
@@ -93,10 +91,11 @@ class TestSuite_Mesh(unittest.TestCase):
         # Check refresh is successful and strategy have 2 nodes
         self.assertIs(len(con.strategy.addrs), 2)
         self.srv.stop()
-        print(con.strategy.addrs)
-
-        print(self.srv.is_started())
-        resp = con.call('srv_id')
+        
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            resp = con.call('srv_id')
+        
         self.assertIs(resp.data and resp.data[0] == 2, True)
 
         con.close()

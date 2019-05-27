@@ -16,6 +16,10 @@ from tarantool.const import (
     DEFAULT_CLUSTER_DISCOVERY_DELAY_MILLIS,
 )
 
+from tarantool.request import (
+    RequestCall
+)
+
 from tarantool.utils import (
     ENCODING_DEFAULT
 )
@@ -141,7 +145,8 @@ class MeshConnection(Connection):
         now = time.time()
 
         if self.connected and now - self.last_nodes_refresh > self.nodes_refresh_interval/1000:
-            resp = self.call(self.get_nodes_function_name, reconnect=False)
+            request = RequestCall(self, self.get_nodes_function_name, (), self.call_16)
+            resp =  self._send_request_wo_reconnect(request)
 
             # got data to refresh        
             if resp.data and resp.data[0]:
