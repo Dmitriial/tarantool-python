@@ -104,7 +104,7 @@ class MeshConnection(Connection):
         end
     '''
 
-    def __init__(self, host, port,
+    def __init__(self, host=None, port=None,
                  user=None,
                  password=None,
                  socket_timeout=SOCKET_TIMEOUT,
@@ -114,23 +114,29 @@ class MeshConnection(Connection):
                  encoding=ENCODING_DEFAULT,
                  call_16=False,
                  connection_timeout=CONNECTION_TIMEOUT,
-                 cluster_list=None,
+                 addrs=None,
                  strategy_class=RoundRobinStrategy,
                  get_nodes_function_name=None,
                  nodes_refresh_interval=DEFAULT_CLUSTER_DISCOVERY_DELAY_MILLIS):
 
-        addrs = [{"host": host, "port": port}]
-        if cluster_list:
-            for i in cluster_list:
-                if i["host"] == host or i["port"] == port:
-                    continue
-                addrs.append(i)
+        addrs_list = []
 
-        self.strategy = strategy_class(addrs)
+        if host and port:
+            addrs_list.append({'host':host, 'port':port})
+
+        if addrs:
+            for addr in addrs:
+                if 'host' in addr and 'port' in addr:
+                    addrs_list.append({'host': addr['host'], 'port': addr['port']})
+
         self.strategy_class = strategy_class
-        addr = self.strategy.getnext()
-        host = addr['host']
-        port = addr['port']
+        self.strategy = strategy_class(addrs_list)
+
+        if not host and not port:
+            addr = self.strategy.getnext()
+            host = addr['host']
+            port = addr['port']
+        
         self.get_nodes_function_name = get_nodes_function_name
         self.nodes_refresh_interval = nodes_refresh_interval
         self.last_nodes_refresh = time.time()
